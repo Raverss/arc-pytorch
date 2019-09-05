@@ -3,6 +3,8 @@ PyTorch implementation of [Attentive Recurrent Comparators](https://arxiv.org/ab
 
 A [blog](https://medium.com/@sanyamagarwal/understanding-attentive-recurrent-comparators-ea1b741da5c3) explaining Attentive Recurrent Comparators
 
+This is repository for testing ARC on custom (digits) dataset.
+
 ### How to run?
 
 #### Download data
