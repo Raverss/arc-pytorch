@@ -3,28 +3,23 @@ taken and modified from https://github.com/pranv/ARC
 """
 
 import os
-import numpy as np
-from numpy.random import choice
-import torch
-from torch.autograd import Variable
 
-from scipy.misc import imresize as resize
+import numpy as np
+import torch
+from numpy.random import choice
+from torch.autograd import Variable
 
 from image_augmenter import ImageAugmenter
 
 use_cuda = False
 
 
-class Omniglot(object):
-    def __init__(self, path=os.path.join('data', 'omniglot.npy'), batch_size=128, image_size=32):
+class Digits(object):
+    def __init__(self, batch_size=128):
         """
         batch_size: the output is (2 * batch size, 1, image_size, image_size)
                     X[i] & X[i + batch_size] are the pair
         image_size: size of the image
-        data_split: in number of alphabets, e.g. [30, 10] means out of 50 Omniglot characters,
-                    30 is for training, 10 for validation and the remaining(10) for testing
-        within_alphabet: for verfication task, when 2 characters are sampled to form a pair,
-                        this flag specifies if should they be from the same alphabet/language
         ---------------------
         Data Augmentation Parameters:
             flip: here flipping both the images in a pair
@@ -33,55 +28,44 @@ class Omniglot(object):
             shear_deg
             translation_px: in both x and y directions
         """
-        chars = np.load(path)
+        # load training examples and labels
+        tx = np.load(os.path.join('data', 'train_data.npy'))
+        tx_starts = np.load(os.path.join('data', 'train_starts.npy'))
+        tx_sizes = np.load(os.path.join('data', 'train_sizes.npy'))
+        # load testing examples and labels
+        tsx = np.load(os.path.join('data', 'test_data.npy'))
+        tsx_starts = np.load(os.path.join('data', 'test_starts.npy'))
+        tsx_sizes = np.load(os.path.join('data', 'test_sizes.npy'))
 
-        # resize the images
-        resized_chars = np.zeros((1623, 20, image_size, image_size), dtype='uint8')
-        for i in range(1623):
-            for j in range(20):
-                resized_chars[i, j] = resize(chars[i, j], (image_size, image_size))
-        chars = resized_chars
+        # [H: 28, W: 26]
+        image_size = tx.shape[1:3]
+        # We'll be using training mean only
+        self.mean_train = tx.mean() / 255.0  # used later for mean subtraction
 
-        self.mean_pixel = chars.mean() / 255.0  # used later for mean subtraction
-
-        # starting index of each alphabet in a list of chars
-        a_start = [0, 20, 49, 75, 116, 156, 180, 226, 240, 266, 300, 333, 355, 381,
-                   424, 448, 496, 518, 534, 586, 633, 673, 699, 739, 780, 813,
-                   827, 869, 892, 909, 964, 984, 1010, 1036, 1062, 1088, 1114,
-                   1159, 1204, 1245, 1271, 1318, 1358, 1388, 1433, 1479, 1507,
-                   1530, 1555, 1597]
-
-        # size of each alphabet (num of chars)
-        a_size = [20, 29, 26, 41, 40, 24, 46, 14, 26, 34, 33, 22, 26, 43, 24, 48, 22,
-                  16, 52, 47, 40, 26, 40, 41, 33, 14, 42, 23, 17, 55, 20, 26, 26, 26,
-                  26, 26, 45, 45, 41, 26, 47, 40, 30, 45, 46, 28, 23, 25, 42, 26]
-
-        # each alphabet/language has different number of characters.
-        # in order to uniformly sample all characters, we need weigh the probability
-        # of sampling a alphabet by its size. p is that probability
+        # remain after Omniglot, sampling probability for each alphabet given by number of its characters.
         def size2p(size):
             s = np.array(size).astype('float64')
             return s / s.sum()
 
         self.size2p = size2p
 
-        self.data = chars
-        self.a_start = a_start
-        self.a_size = a_size
+        self.data = {'train': tx, 'test': tsx}
+        self.a_start = {'train': tx_starts, 'test': tsx_starts}
+        self.a_size = {'train': tx_sizes, 'test': tsx_sizes}
         self.image_size = image_size
         self.batch_size = batch_size
 
         flip = True
-        scale = 0.2
-        rotation_deg = 20
-        shear_deg = 10
-        translation_px = 5
-        self.augmentor = ImageAugmenter(image_size, image_size,
+        scale = 0.1
+        rotation_deg = 10
+        shear_deg = 5
+        translation_px = 2
+        self.augmentor = ImageAugmenter(image_size[1], image_size[0],
                                         hflip=flip, vflip=flip,
                                         scale_to_percent=1.0 + scale, rotation_deg=rotation_deg, shear_deg=shear_deg,
                                         translation_x_px=translation_px, translation_y_px=translation_px)
 
-    def fetch_batch(self, part):
+    def fetch_batch(self, phase):
         """
             This outputs batch_size number of pairs
             Thus the actual number of images outputted is 2 * batch_size
@@ -97,44 +81,47 @@ class Omniglot(object):
                 Dissimilar A 		0 - batch_size / 2
                 Similar A    		batch_size / 2  - batch_size
                 Dissimilar B 		batch_size  - 3 * batch_size / 2
-                Similar B 			3 * batch_size / 2 - batch_size
+                Similar B 			3 * batch_size / 2 - 2 * batch_size
 
         """
         pass
 
+    def fetch_test_batch(self):
+        """
+            Creates batch [number of training images, 2, image height, image width]. [:, 0, ...] contains all training
+             images and [:, 1, ...] contains copy of i-th test image. Therefore we get similarity measure of i-th image
+             with all training images. Format remains same as in fetch_batch(self, phase)
+        """
+        pass
 
-class Batcher(Omniglot):
-    def __init__(self, path=os.path.join('data', 'omniglot.npy'), batch_size=128, image_size=32):
-        Omniglot.__init__(self, path, batch_size, image_size)
 
-        a_start = self.a_start
-        a_size = self.a_size
+class Batcher(Digits):
+    def __init__(self, batch_size=128):
+        Digits.__init__(self, batch_size)
 
-        # slicing indices for splitting a_start & a_size
-        i = 20
-        j = 30
-        starts = {}
-        starts['train'], starts['val'], starts['test'] = a_start[:i], a_start[i:j], a_start[j:]
-        sizes = {}
-        sizes['train'], sizes['val'], sizes['test'] = a_size[:i], a_size[i:j], a_size[j:]
+        starts = self.a_start
+        sizes = self.a_size
 
         size2p = self.size2p
 
-        p = {}
-        p['train'], p['val'], p['test'] = size2p(sizes['train']), size2p(sizes['val']), size2p(sizes['test'])
+        p = {'train': size2p(sizes['train']), 'test': size2p(sizes['test'])}
 
         self.starts = starts
         self.sizes = sizes
         self.p = p
+        self.test_batch_index = 0
 
-    def fetch_batch(self, part, batch_size: int = None):
+    def fetch_batch(self, phase, batch_size: int = None):
 
         if batch_size is None:
             batch_size = self.batch_size
 
-        X, Y = self._fetch_batch(part, batch_size)
+        if phase == 'test':
+            X, Y = self._fetch_test_batch(batch_size)
+        else:
+            X, Y = self._fetch_batch(phase, batch_size)
 
-        X = Variable(torch.from_numpy(X)).view(2*batch_size, self.image_size, self.image_size)
+        X = Variable(torch.from_numpy(X)).view(2 * batch_size, self.image_size[0], self.image_size[1])
 
         X1 = X[:batch_size]  # (B, h, w)
         X2 = X[batch_size:]  # (B, h, w)
@@ -148,43 +135,96 @@ class Batcher(Omniglot):
 
         return X, Y
 
-    def _fetch_batch(self, part, batch_size: int = None):
+    def _fetch_batch(self, phase, batch_size: int = None):
         if batch_size is None:
             batch_size = self.batch_size
 
         data = self.data
-        starts = self.starts[part]
-        sizes = self.sizes[part]
-        p = self.p[part]
+        starts = self.starts[phase]
+        sizes = self.sizes[phase]
+        p = self.p[phase]
         image_size = self.image_size
+        # number of classes
+        num_digits = len(starts)
 
-        num_alphbts = len(starts)
-
-        X = np.zeros((2 * batch_size, image_size, image_size), dtype='uint8')
+        # batch array
+        X = np.zeros((2 * batch_size, image_size[0], image_size[1]), dtype='uint8')
         for i in range(batch_size // 2):
-            # choose similar chars
-            same_idx = choice(range(starts[0], starts[-1] + sizes[-1]))
+            # choose first digit class
+            base_digit_class = choice(num_digits, p=p)
+            dissimilar_digit_class = base_digit_class
+            # choose dissimilar digit class different from base digit class
+            while dissimilar_digit_class == base_digit_class:
+                dissimilar_digit_class = choice(num_digits, p=p)
+            # select random digit from from base_digit_class class
+            base_digit = data[phase][starts[base_digit_class] + choice(sizes[base_digit_class], 1)]
+            # select random digit from from base_digit_class class. With high probability different from base_digit
+            similar_digit = data[phase][starts[base_digit_class] + choice(sizes[base_digit_class], 1)]
+            # select random digit from from dissimilar_digit_class class
+            dissimilar_digit = data[phase][starts[dissimilar_digit_class] + choice(sizes[dissimilar_digit_class], 1)]
 
-            # choose dissimilar chars within alphabet
-            alphbt_idx = choice(num_alphbts, p=p)
-            char_offset = choice(sizes[alphbt_idx], 2, replace=False)
-            diff_idx = starts[alphbt_idx] + char_offset
-
-            X[i], X[i + batch_size] = data[diff_idx, choice(20, 2)]
-            X[i + batch_size // 2], X[i + 3 * batch_size // 2] = data[same_idx, choice(20, 2, replace=False)]
+            # save into batch array
+            X[i], X[i + batch_size] = base_digit, dissimilar_digit
+            X[i + batch_size // 2], X[i + 3 * batch_size // 2] = base_digit, similar_digit
 
         y = np.zeros((batch_size, 1), dtype='int32')
+        # first half of batch are dissimilar digits
         y[:batch_size // 2] = 0
+        # second half of batch are similar digits
         y[batch_size // 2:] = 1
 
-        if part == 'train':
+        if phase == 'train':
+            # augmentator rescale intensities from [0-255] to [0.0 - 1.0]!
             X = self.augmentor.augment_batch(X)
+            X = X - self.mean_train
         else:
             X = X / 255.0
-
-        X = X - self.mean_pixel
+            X = X - self.mean_train
+        # for stacking purposes
         X = X[:, np.newaxis]
         X = X.astype("float32")
 
         return X, y
 
+    def fetch_test_batch(self):
+        """
+        Creates batch for testing batch_index-th test image.
+        :return: batch array in format of [batch size, 2 (pair to be compared), image height, image width]
+        """
+        data = self.data
+        # size of train dataset
+        num_train = data['train'].shape[0]
+        image_size = self.image_size
+        # index of test image that is being classified in this batch
+        batch_index = self.test_batch_index
+
+        # create batch array
+        X = np.zeros([2 * num_train, image_size[0], image_size[1]], dtype='uint8')
+        # first half are all training images
+        X[:num_train, ...] = data['train']
+        # second half is copy of a batch_index-th test image to be classified
+        X[num_train:, ...] = data['test'][batch_index, ...]
+        # true label is extracted from array of indexes where particular class start
+        test_label = np.argmax(self.starts['test']>batch_index) - 1
+
+        # rescale intensities and center
+        X = X / 255.0
+        X = X - self.mean_train
+
+        X = X[:, np.newaxis]
+        X = X.astype("float32")
+
+        self.test_batch_index += 1
+
+        X = Variable(torch.from_numpy(X)).view(2 * num_train, self.image_size[0], self.image_size[1])
+
+        # stack batch by second axis to [batch size, 2 (pair to be compared), image height, image width]
+        X1 = X[:num_train]  # (B, h, w)
+        X2 = X[num_train:]  # (B, h, w)
+
+        X = torch.stack([X1, X2], dim=1)  # (B, 2, h, w)
+
+        if use_cuda:
+            X = X.cuda()
+        # using test dataset size and current index for controlling test loop in test_model.py
+        return X, test_label, data['test'].shape[0], self.test_batch_index

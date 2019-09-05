@@ -3,31 +3,27 @@ PyTorch implementation of [Attentive Recurrent Comparators](https://arxiv.org/ab
 
 A [blog](https://medium.com/@sanyamagarwal/understanding-attentive-recurrent-comparators-ea1b741da5c3) explaining Attentive Recurrent Comparators
 
-### Visualizing Attention
-
-#### On Same characters
-<img src="visualization/16_4_4_256/sim1.gif" width="400"> <img src="visualization/16_4_4_256/sim2.gif" width="400">
-
-#### On Different Characters
-<img src="visualization/16_4_4_256/dis1.gif" width="400"> <img src="visualization/16_4_4_256/dis2.gif" width="400">
-
+This is repository for testing ARC on custom (digits) dataset.
 
 ### How to run?
 
 #### Download data
-```
-python download_data.py
-```
-A one-time 52MB download. Shouldn't take more than a few minutes.
+Download our [data](graphicwg.irafm.osu.cz/storage/ft1-pca-app.zip) and unzip two folders into data folder of this repository.
 
 #### Train
 ```
 python train.py --cuda
 ```
-Let it train until the accuracy rises to at least 80%. Early stopping is not implemented yet. You will have to manually kill the process.
+The training should achieve around 85%+ accuracy on test data.
 
 #### Visualize
 ```
-python viz.py --cuda --load 0.13591022789478302 --same
+python viz.py --cuda --load name_of_model --same
 ```
-Run with exactly the same parameters as train.py and specify the model to load. Specify "--same" if you want to generate a sample with same characters in both images. The script dumps images to a directory in visualization. The name of directory is taken from --name parameter if specified, else name is a function of the parameters of network.
+Run with exactly the same parameters as train.py and specify the model to load. The script dumps images to a directory in visualization. The name of directory is taken from --name parameter if specified, else name is a function of the parameters of network. ```name_of_model``` should be in ```data``` folder.
+
+#### Test accuracy of model
+```
+python test_model.py --cuda --load name_of_model
+```
+```name_of_model``` should be in ```data``` folder.

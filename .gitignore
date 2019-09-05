@@ -1,7 +1,6 @@
 .idea/
 data/
 *.ipynb
-saved_models/
 visualization/
 # Byte-compiled / optimized / DLL files
 __pycache__/
